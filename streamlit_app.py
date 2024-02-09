@@ -31,7 +31,8 @@ df = preprocess_df(df)
 #######################
 # Sidebar
 with st.sidebar:
-    st.title('Performance Hub')
+    st.title('AUVIDA')
+    st.caption('Track & Field automated video-to-dash')
     st.caption('-----')
     
     default_event = df['event'].iloc[0]
@@ -63,7 +64,8 @@ def make_athlete_scatterplot(athlete_df):
         yaxis_title='Race time (s)',
         showlegend=False,
         hovermode="x unified",
-        title='All performances')
+        title='All performances',
+        height=300)
     return fig
 
 # Lineplot
@@ -385,16 +387,17 @@ def make_cluster_time_lineplot(athlete_race_df, cluster_best_df):
     # df_grouped = df_grouped.droplevel(axis=1, level=0).reset_index()
     # df_grouped = df_grouped.sort_values(by="hurdle_id", ascending=True)
     cluster_best_race = cluster_best_df.race.iloc[0]
+    cluster_best_athlete = cluster_best_df.athlete.iloc[0]
     fig = go.Figure([
     go.Scatter(
-        name=selected_athlete+' - Cluster Best @'+cluster_best_race,
+        name='Cluster Best - '+cluster_best_athlete+' @'+cluster_best_race,
         x=cluster_best_df['hurdle_id'],
         y=cluster_best_df['interval'],
         line=dict(color='rgb(247,199,106)', width=0.7), #yellow
         mode='lines+markers'
     ),
     go.Scatter(
-        name=selected_athlete+' - mean',
+        name='Cluster - mean',
         x=athlete_race_df['hurdle_id'],
         y=round(athlete_race_df['mean_intervals'], 2),
         mode='lines',
@@ -638,6 +641,26 @@ def make_special_chart(filtered_data):
 
     return fig
 
+def make_cluster_boxplot(df):
+    # Create a violin plot
+    df = df.groupby(['athlete', 'race', 'cluster', 'cluster_centroid'])['total_time'].max().reset_index()
+    df['cluster_centroid'] = df['cluster_centroid'].round(2)
+    df['cluster'] = df['cluster'].astype(str)
+    # fig = px.violin(df, y="total_time", x="cluster", box=True, points="all", color="cluster")
+    # fig.update_layout(title="Violin Plot of total_time by cluster", xaxis_title="Cluster", yaxis_title="Total Time")
+    # Create the violin plot
+    #df_sorted = df.sort_values(by='cluster_centroid')
+    fig = px.violin(df, 
+                    y='total_time', 
+                    x="cluster_centroid",
+                    color='cluster_centroid', 
+                    box=True,  # if you want to show box plot inside the violin
+                    points='all',  # if you want to show all data points
+                    )
+    fig.update_layout(height=300,title="Violin Plot of total time by cluster", xaxis_title="Cluster", yaxis_title="Total Time")
+
+    return fig
+
 #######################
 # Dashboard Main Panel
 with st.container():
@@ -659,93 +682,78 @@ with st.container():
     filtered_races = df[(df.event == selected_event)&(df.athlete == selected_athlete)].sort_values(by='date', ascending=False)['race'].unique()
     default_race = filtered_races[0]
     selected_race = st.selectbox('Select race:', filtered_races, index=0)
-    
+
     athlete_race_df = df[(df.event == selected_event)&(df.athlete == selected_athlete)&(df.race == selected_race)]
+    st.write('Total time:     ' +str(athlete_race_df.total_time.iloc[0])+' s')
+
 
     race_summary_plot = make_special_chart(athlete_race_df)
     st.plotly_chart(race_summary_plot, use_container_width=True)
 
-    st.dataframe(athlete_race_df,
-                column_order=("split", "hurdle_id_label", "velocity", "strides", "interval", "hurdle_timing", "temporary_place"),
-                hide_index=True,
-                width=None,
-                use_container_width=True,
-                column_config={
-                    "split": st.column_config.TextColumn(
-                        "Split",
-                    ),
-                    "hurdle_id_label": st.column_config.TextColumn(
-                        "Split ID",
-                    ),
-                    "velocity": st.column_config.ProgressColumn(
-                        "velocity",
-                        format="%f"+" m/s",
-                        min_value=min(athlete_race_df.velocity),
-                        max_value=max(athlete_race_df.velocity),
-                    ),
-                    "strides": st.column_config.ProgressColumn(
-                        "Strides",
-                        format="%f",
-                        min_value=min(athlete_race_df.strides),
-                        max_value=max(athlete_race_df.strides),
-                    ),
-                    "interval": st.column_config.ProgressColumn(
-                        "Split time",
-                        format="%f"+" s",
-                        min_value=min(athlete_race_df.interval),
-                        max_value=max(athlete_race_df.interval),
-                     ),
-                    "hurdle_timing": st.column_config.ProgressColumn(
-                        "Total time",
-                        format="%f"+" s",
-                        min_value=min(athlete_race_df.hurdle_timing),
-                        max_value=max(athlete_race_df.hurdle_timing),
-                     ),
-                    "temporary_place": st.column_config.TextColumn(
-                        "Position",
+    with st.expander('Race details', expanded=True):
+
+        st.dataframe(athlete_race_df,
+                    column_order=("split", "hurdle_id_label", "velocity", "strides", "interval", "hurdle_timing", "temporary_place"),
+                    hide_index=True,
+                    width=None,
+                    use_container_width=True,
+                    column_config={
+                        "split": st.column_config.TextColumn(
+                            "Split",
+                        ),
+                        "hurdle_id_label": st.column_config.TextColumn(
+                            "Split ID",
+                        ),
+                        "velocity": st.column_config.ProgressColumn(
+                            "velocity",
+                            format="%f"+" m/s",
+                            min_value=min(athlete_race_df.velocity),
+                            max_value=max(athlete_race_df.velocity),
+                        ),
+                        "strides": st.column_config.ProgressColumn(
+                            "Strides",
+                            format="%f",
+                            min_value=min(athlete_race_df.strides),
+                            max_value=max(athlete_race_df.strides),
+                        ),
+                        "interval": st.column_config.ProgressColumn(
+                            "Split time",
+                            format="%f"+" s",
+                            min_value=min(athlete_race_df.interval),
+                            max_value=max(athlete_race_df.interval),
+                        ),
+                        "hurdle_timing": st.column_config.ProgressColumn(
+                            "Total time",
+                            format="%f"+" s",
+                            min_value=min(athlete_race_df.hurdle_timing),
+                            max_value=max(athlete_race_df.hurdle_timing),
+                        ),
+                        "temporary_place": st.column_config.TextColumn(
+                            "Position",
+                        )
+                        }
                     )
-                    }
-                )
-   
-with st.container():
-
-    st.subheader('Race Comparison (Intra-Athlete)')
-
-    st.write('Baseline race:     ' +selected_race)
-
-    filtered_races_2 = df[(df.event == selected_event)&(df.athlete == selected_athlete)&(df.race != selected_race)]['race'].unique()
-    default_race_2 = filtered_races[0]
-    selected_race_2 = st.selectbox('Select race to compare to baseline:', filtered_races_2, index=0)
     
-    athlete_race_df_2 = df[(df.event == selected_event)&(df.athlete == selected_athlete)&(df.race == selected_race_2)]
-
-    performances_barchart_compare = make_performance_compare_barchart(athlete_race_df, athlete_race_df_2, athlete_df)
-    st.plotly_chart(performances_barchart_compare, use_container_width=True)
-
-    split_lineplot = make_athlete_velocity_lineplot(athlete_race_df,athlete_race_df_2, athlete_df,)
-    st.plotly_chart(split_lineplot, use_container_width=True)
-
-    time_lineplot = make_athlete_time_lineplot(athlete_race_df,athlete_race_df_2, athlete_df,)
-    st.plotly_chart(time_lineplot, use_container_width=True)
-
-    # cum_time_lineplot = make_athlete_cumtime_lineplot(athlete_race_df, athlete_race_df_2, athlete_df,)
-    # st.plotly_chart(cum_time_lineplot, use_container_width=True)
-
-    stride_barplot = make_athlete_stride_barplot(athlete_race_df,athlete_race_df_2, athlete_df,)
-    st.plotly_chart(stride_barplot, use_container_width=True)
-     
 with st.container():
 
     st.subheader("Race Comparison (Intra-Cluster)")
 
-    # cluster_default = athlete_race_df.cluster.iloc[0]
-    # cluster_list = sorted(df.cluster.unique())
-    # selected_cluster = st.selectbox('Select cluster to compare:', [str(x) for x in cluster_list], index=cluster_default)
+    with st.expander('Cluster Comparison', expanded=True):
+        st.write('''
+            The clusters allow comparing races with similar performance profiles.  
+            ''')
+        cluster_performance_chart = make_cluster_boxplot(df)
+        st.plotly_chart(cluster_performance_chart, use_container_width=True)
+        
+
     cluster_df = df[df['cluster'] == athlete_race_df.cluster.iloc[0]]
     cluster_best_df = cluster_df[cluster_df['total_time'] == cluster_df['total_time'].min()]
 
-    velocity_cluster_plot = make_cluster_velocity_lineplot(athlete_race_df, cluster_best_df)
-    st.plotly_chart(velocity_cluster_plot, use_container_width=True)
+    # velocity_cluster_plot = make_cluster_velocity_lineplot(athlete_race_df, cluster_best_df)
+    # st.plotly_chart(velocity_cluster_plot, use_container_width=True)
+
+    time_cluster_plot = make_cluster_time_lineplot(athlete_race_df, cluster_best_df)
+    st.plotly_chart(time_cluster_plot, use_container_width=True)
 
     # st.write('Feature importance')
     # st.dataframe(athlete_race_df.pivot(columns='hurdle_id_label', values='feature_importance',).reset_index(),
@@ -755,8 +763,38 @@ with st.container():
     #             )
    
 
-    # time_cluster_plot = make_cluster_time_lineplot(athlete_race_df, cluster_best_df)
-    # st.plotly_chart(time_cluster_plot, use_container_width=True)
+
+
+
+with st.container():
+
+    st.subheader('Race Comparison (Intra-Athlete)')
+
+    st.write('Baseline race:     ' +selected_race)
+
+    if len(df[(df.event == selected_event)&(df.athlete == selected_athlete)]['race'].unique()) == 1:
+        st.write('Athlete has only one race in the database.')
+    else:
+        filtered_races_2 = df[(df.event == selected_event)&(df.athlete == selected_athlete)&(df.race != selected_race)]['race'].unique()
+        default_race_2 = filtered_races[0]
+        selected_race_2 = st.selectbox('Select race to compare to baseline:', filtered_races_2, index=0)
+        
+        athlete_race_df_2 = df[(df.event == selected_event)&(df.athlete == selected_athlete)&(df.race == selected_race_2)]
+
+        performances_barchart_compare = make_performance_compare_barchart(athlete_race_df, athlete_race_df_2, athlete_df)
+        st.plotly_chart(performances_barchart_compare, use_container_width=True)
+
+        split_lineplot = make_athlete_velocity_lineplot(athlete_race_df,athlete_race_df_2, athlete_df,)
+        st.plotly_chart(split_lineplot, use_container_width=True)
+
+        time_lineplot = make_athlete_time_lineplot(athlete_race_df,athlete_race_df_2, athlete_df,)
+        st.plotly_chart(time_lineplot, use_container_width=True)
+
+        # cum_time_lineplot = make_athlete_cumtime_lineplot(athlete_race_df, athlete_race_df_2, athlete_df,)
+        # st.plotly_chart(cum_time_lineplot, use_container_width=True)
+
+        stride_barplot = make_athlete_stride_barplot(athlete_race_df,athlete_race_df_2, athlete_df,)
+        st.plotly_chart(stride_barplot, use_container_width=True)
 
 with st.container():
 
