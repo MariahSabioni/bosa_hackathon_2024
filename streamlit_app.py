@@ -74,7 +74,7 @@ def make_compare_split_lineplot(athlete_race_df, df_compare):
 
     fig.add_trace(
         go.Scatter(
-            name=selected_athlete+' - '+selected_race,
+            name=selected_athlete+' - '+selected_race+' - '+str(athlete_race_df['total_time'].iloc[0]),
             x=athlete_race_df['hurdle_id'],
             y=athlete_race_df['velocity'],
             line=dict(color='red'),
@@ -87,7 +87,7 @@ def make_compare_split_lineplot(athlete_race_df, df_compare):
             df_compare_r = df_compare_a[df_compare_a['race']==race]
             fig.add_trace(
                 go.Scatter(
-                    name=athlete+' - '+race,
+                    name=athlete+' - '+race+' - '+str(df_compare_r['total_time'].iloc[0]),
                     x=df_compare_r['hurdle_id'],
                     y=df_compare_r['velocity'],
                     mode='lines'
@@ -379,23 +379,23 @@ def make_cluster_velocity_lineplot(athlete_race_df, cluster_best_df):
     ))
     return fig
 
-def make_cluster_time_lineplot(athlete_race_df, cluster_best_df):
+def make_cluster_time_lineplot(athlete_race_df):
     # df_grouped = (
     #     athlete_df[['split', 'hurdle_id','velocity']].groupby(['split', 'hurdle_id'])
     #     .agg(['mean', 'std', 'count'])
     # )
     # df_grouped = df_grouped.droplevel(axis=1, level=0).reset_index()
     # df_grouped = df_grouped.sort_values(by="hurdle_id", ascending=True)
-    cluster_best_race = cluster_best_df.race.iloc[0]
-    cluster_best_athlete = cluster_best_df.athlete.iloc[0]
+    # cluster_best_race = cluster_best_df.race.iloc[0]
+    # cluster_best_athlete = cluster_best_df.athlete.iloc[0]
     fig = go.Figure([
-    go.Scatter(
-        name='Cluster Best - '+cluster_best_athlete+' @'+cluster_best_race,
-        x=cluster_best_df['hurdle_id'],
-        y=cluster_best_df['interval'],
-        line=dict(color='rgb(247,199,106)', width=0.7), #yellow
-        mode='lines+markers'
-    ),
+    # go.Scatter(
+    #     name='Cluster Best - '+cluster_best_athlete+' @'+cluster_best_race,
+    #     x=cluster_best_df['hurdle_id'],
+    #     y=cluster_best_df['interval'],
+    #     line=dict(color='rgb(247,199,106)', width=0.7), #yellow
+    #     mode='lines+markers'
+    # ),
     go.Scatter(
         name='Cluster - mean',
         x=athlete_race_df['hurdle_id'],
@@ -595,8 +595,8 @@ def make_special_chart(filtered_data):
         x=filtered_data['hurdle_id'],
         y=filtered_data['velocity'],
         name='Velocity',
-        line=dict(color='white'),
-        textfont=dict(color='white'),
+        line=dict(color='grey'),
+        textfont=dict(color='grey'),
         text=filtered_data['velocity'],  # labels
         textposition='top center',  # Set text position
         mode='lines+markers+text',
@@ -646,6 +646,7 @@ def make_cluster_boxplot(df):
     df = df.groupby(['athlete', 'race', 'cluster', 'cluster_centroid'])['total_time'].max().reset_index()
     df['cluster_centroid'] = df['cluster_centroid'].round(2)
     df['cluster'] = df['cluster'].astype(str)
+    df = df.sort_values(by='cluster_centroid')
     # fig = px.violin(df, y="total_time", x="cluster", box=True, points="all", color="cluster")
     # fig.update_layout(title="Violin Plot of total_time by cluster", xaxis_title="Cluster", yaxis_title="Total Time")
     # Create the violin plot
@@ -657,7 +658,9 @@ def make_cluster_boxplot(df):
                     box=True,  # if you want to show box plot inside the violin
                     points='all',  # if you want to show all data points
                     )
-    fig.update_layout(height=300,title="Violin Plot of total time by cluster", xaxis_title="Cluster", yaxis_title="Total Time")
+    fig.update_layout(height=300,title="Total time by cluster", xaxis_title="Cluster", yaxis_title="Total Time",                     legend=dict(
+                        traceorder='normal'
+                    ))
 
     return fig
 
@@ -685,7 +688,6 @@ with st.container():
 
     athlete_race_df = df[(df.event == selected_event)&(df.athlete == selected_athlete)&(df.race == selected_race)]
     st.write('Total time:     ' +str(athlete_race_df.total_time.iloc[0])+' s')
-
 
     race_summary_plot = make_special_chart(athlete_race_df)
     st.plotly_chart(race_summary_plot, use_container_width=True)
@@ -738,32 +740,29 @@ with st.container():
 
     st.subheader("Race Comparison (Intra-Cluster)")
 
-    with st.expander('Cluster Comparison', expanded=True):
+    with st.expander('Performance Clusters', expanded=True):
         st.write('''
             The clusters allow comparing races with similar performance profiles.  
             ''')
         cluster_performance_chart = make_cluster_boxplot(df)
         st.plotly_chart(cluster_performance_chart, use_container_width=True)
-        
 
+        st.dataframe(make_cluster_table(df))
+    
+    selected_date = athlete_race_df.date.iloc[0]
     cluster_df = df[df['cluster'] == athlete_race_df.cluster.iloc[0]]
-    cluster_best_df = cluster_df[cluster_df['total_time'] == cluster_df['total_time'].min()]
+    cluster_mean = round(cluster_df.cluster_centroid.iloc[0],2)
+    cluster_std = round(cluster_df.total_time.std(),2)
+    cluster_feature_importance = cluster_df.feature_importance.max()
+    # cluster_best_df = cluster_df[cluster_df['total_time'] == cluster_df['total_time'].min()]
+    st.write(f'Baseline race:     {selected_race}, Date:     {selected_date}, Cluster:     {cluster_mean} ± {cluster_std} s')
 
     # velocity_cluster_plot = make_cluster_velocity_lineplot(athlete_race_df, cluster_best_df)
     # st.plotly_chart(velocity_cluster_plot, use_container_width=True)
 
-    time_cluster_plot = make_cluster_time_lineplot(athlete_race_df, cluster_best_df)
+    time_cluster_plot = make_cluster_time_lineplot(athlete_race_df)
     st.plotly_chart(time_cluster_plot, use_container_width=True)
-
-    # st.write('Feature importance')
-    # st.dataframe(athlete_race_df.pivot(columns='hurdle_id_label', values='feature_importance',).reset_index(),
-    #             hide_index=True,
-    #             width=None,
-    #             use_container_width=True,
-    #             )
    
-
-
 
 
 with st.container():
@@ -800,8 +799,14 @@ with st.container():
 
     dynamic_filters = DynamicFilters(df, filters=['athlete', 'race'])
     st.subheader("Race Comparison (Inter-Athlete)")
+
+    st.write('Baseline race:     ' +selected_race)
+    st.write('Select any athlete and race to compare to baseline:')
+
     dynamic_filters.display_filters(location='columns', num_columns=2, gap='medium')
     compare_df = dynamic_filters.filter_df()
+
+    st.subheader('Performances')
 
     st.subheader('Splits')
     split_compare_lineplot = make_compare_split_lineplot(athlete_race_df, compare_df,)
