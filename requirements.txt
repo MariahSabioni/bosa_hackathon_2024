@@ -94,4 +94,4 @@ validators==0.22.0
 watchdog==3.0.0
 wcwidth==0.2.13
 zipp==3.17.0
-sklearn==1.4.0
+scikit-learn==1.4.0
